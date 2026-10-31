@@ -1,0 +1,29 @@
+# local assistant instructions with personal / cluster details
+CLAUDE.md
+.claude/
+
+# outputs, third-party installs and downloaded data (recreate with the scripts, see README)
+experiments/
+tools/
+tmp/
+data/*
+!data/personas.json
+!data/hiring/
+data/hiring/*
+!data/hiring/bls_directions.json
+
+# paper PDF and its text extraction (not redistributed)
+*.pdf
+!report/main.pdf
+notes/paper_text_pypdf.txt
+
+# LaTeX build files
+report/*.aux
+report/*.log
+report/*.out
+report/*.err
+report/*.zip
+
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
