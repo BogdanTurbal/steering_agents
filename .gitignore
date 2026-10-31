@@ -2,15 +2,21 @@
 CLAUDE.md
 .claude/
 
-# outputs, third-party installs and downloaded data (recreate with the scripts, see README)
+# outputs and third-party installs (recreate with the scripts, see README)
 experiments/
 tools/
 tmp/
+
+# data: only what is needed to reproduce is tracked (full paper texts and download caches are not)
 data/*
 !data/personas.json
 !data/hiring/
-data/hiring/*
-!data/hiring/bls_directions.json
+!data/codelmsec/
+data/codelmsec/*
+!data/codelmsec/benchmark/
+!data/iclr2025/
+data/iclr2025/*
+!data/iclr2025/paper_manifest.csv
 
 # paper PDF and its text extraction (not redistributed)
 *.pdf

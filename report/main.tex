@@ -53,7 +53,7 @@ Review & Pragmatist, theorist, empiricist reviewers & Meta-reviewer synthesis + 
 \caption{The three applications. In hiring, one evaluator is replaced by the paper's adversarial persona (biased by stereotyped occupation demographics from BLS CPS Table~11) in rounds 1--2 and restored afterwards.}
 \end{table}
 
-\paragraph{Execution.} All calls of a phase (e.g.\ every reviewer of every run) are submitted to vLLM at once (up to 1000 concurrent sequences, prefix caching, 262k context); every reply is appended to disk the moment it finishes, so interrupted jobs lose almost nothing and can be resumed. One 8-hour GPU job per application runs the MAS, then (inside the same job) CodeQL on the generated code and the automatic analysis and quality report. Settings follow our earlier resman code: bf16, no quantization, chat-template thinking with \texttt{reasoning\_effort=medium}, temperature 1.0, top-p 0.95, top-k 20.
+\paragraph{Execution.} All calls of a phase (e.g.\ every reviewer of every run) are submitted to vLLM at once (up to 1000 concurrent sequences, prefix caching, 262k context); every reply is appended to disk the moment it finishes, so interrupted jobs lose almost nothing and can be resumed. One 8-hour GPU job per application runs the MAS, then (inside the same job) CodeQL on the generated code and the automatic analysis and quality report. Settings: bf16, no quantization, chat-template thinking with \texttt{reasoning\_effort=medium}, temperature 1.0, top-p 0.95, top-k 20.
 
 \section{Metrics}
 With $r_i^{(t)}$ the score of agent $i$ in round $t$, $\bar r^{(t)}$ the panel mean, and scale $[r_{\min},r_{\max}]$ (averaged over all runs):

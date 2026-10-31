@@ -22,7 +22,7 @@ Downstream analyses: CodeQL vulnerability rates (all code, and "deployed" = pane
 - One model for every agent (paper's single-LLM setting). The 16 mixed-model setups are not run (config supports a
   per-role model name, but only one engine is loaded per process).
 - Model: `Qwen/Qwen3.8-27B` (bf16) quantized to bnb 4-bit by vLLM at load (`quantization=load_format=bitsandbytes`,
-  `gdn_prefill_backend=triton` as in resman); `reasoning_effort=medium` (template default xhigh is too long).
+  `gdn_prefill_backend=triton` for the gated-delta-net layers); `reasoning_effort=medium` (template default xhigh is too long).
 - Peer review: OpenReview is behind a challenge page from here. Metadata (decision, primary area, arXiv id) from
   `demfier/reviewertoo-iclr2025` (iclr2025_full), PDFs from `simon123905/iclr2025_all_zips` (read remotely), all text via
   PyMuPDF (`scripts/prepare_iclr_data.py`). Sample = all Oral+Spotlight (592) + 300 Posters + 999 Rejected + 27 desk-rejected
@@ -51,13 +51,11 @@ Downstream analyses: CodeQL vulnerability rates (all code, and "deployed" = pane
 - Design choices where the paper is silent: coding reviewers now see the full global state (all prior codes + all critics' feedback; changed 2026-10-26 at user's request;
   `--reviewers-own-only` restores the paper-literal "critic's feedback" reading), the generator sees all critics' feedback; hiring adversary role rotates over the 4 evaluators by pair hash and is
   adversarial in rounds 1-2 only; failed parses are retried twice with new seeds, then dropped (NaN) from metrics.
-- pip-installed `gdown` into the shared `resman_fla` env (login node) to fetch the CodeLMSec zip.
 - 2026-10-26: user asked to implement only, not run experiments. Smoke jobs 16291449-53 were cancelled before starting.
   Nothing has run on the real model; do not launch tiers until the user says so.
 - 2026-10-26 (later): the 'cancelled' smoke jobs had in fact started and FAILED before the cancel (coding_0, review_0,
   build_hiring: ~90 s, vLLM engine init). Root cause: vLLM 0.25.1's bitsandbytes loader cannot load the pre-quantized
-  unsloth checkpoint (`assert param_data.shape == loaded_weight.shape`, linear.py weight_loader). resman never used that
-  checkpoint (it serves bf16 `Qwen/Qwen3.8-27B`). Fix applied in `steering_agents/llm.py` (in-flight bnb quantization of the
+  unsloth checkpoint (`assert param_data.shape == loaded_weight.shape`, linear.py weight_loader), so the bf16 `Qwen/Qwen3.8-27B` is used. Fix applied in `steering_agents/llm.py` (in-flight bnb quantization of the
   bf16 model); NOT yet verified on a GPU (user asked not to run anything). If it still fails, alternatives: `quant="fp8"`
   or bf16 with tensor_parallel_size=2.
 - 2026-10-26 (late): context now 262,144 tokens (+ per-call over-length guard); replies are saved one by one as they finish
@@ -67,6 +65,6 @@ Downstream analyses: CodeQL vulnerability rates (all code, and "deployed" = pane
   medium tier ~345 GPU-h, full ~5,000 GPU-h (hiring 2,900 + review 2,100); estimates are extrapolated from the smoke run.
 - 2026-10-26 (night): first medium launch (jobs 16303846-48) crashed ~6 min in: `KeyError` in Engine.stream (vLLM's enqueue returns
   internal ids with an 8-char suffix, outputs carry the external id) + analyze.py crashed on empty runs. Both fixed. Engine now
-  mirrors resman's VLLMThinkingModel (LLM kwargs dtype auto/tp1/gpu_mem 0.90/trust_remote_code/no eager/gdn triton, env defaults,
+  uses these LLM settings (LLM kwargs dtype auto/tp1/gpu_mem 0.90/trust_remote_code/no eager/gdn triton, env defaults,
   prompts rendered with tokenizer.apply_chat_template(enable_thinking, reasoning_effort) and passed as text, sampling 1.0/0.95/20).
-  Deliberate differences: max_model_len 262144, max_num_seqs 1000, prefix caching, per-request seeds. Relaunched as 16304261-63.
+  Other settings: max_model_len 262144, max_num_seqs 1000, prefix caching, per-request seeds. Relaunched as 16304261-63.

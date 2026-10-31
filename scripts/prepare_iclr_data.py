@@ -6,6 +6,9 @@ member-by-member; desk-rejected papers (not in the zips) fall back to their arXi
 All text comes from the same extractor (PyMuPDF) so accepted/rejected papers are comparable. Main text only
 (references/appendix cut).
 Sample (paper App. B.3): all Oral+Spotlight, 300 Posters, 1000 Rejected, all desk-rejected with text.
+The sample used in our run is stored as data/iclr2025/paper_manifest.csv (ids, decisions, areas; the full texts are NOT in the
+repo because the papers are third-party material). By default this script rebuilds exactly that set from the manifest; pass
+--resample to draw a new random sample instead.
 Needs pymupdf + remotezip (`pip install pymupdf remotezip`, or `pip install --target DIR ...` and put DIR on PYTHONPATH).
 Resumable: appends to --out, skips finished paper ids.
 """
@@ -74,18 +77,29 @@ if __name__ == "__main__":
     ap.add_argument("--n-reject", type=int, default=1000)
     ap.add_argument("--workers", type=int, default=6)
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--manifest", default="data/iclr2025/paper_manifest.csv")
+    ap.add_argument("--resample", action="store_true", help="ignore the manifest and draw a new random sample")
+    ap.add_argument("--dry-run", action="store_true", help="only print the selected sample size")
     a = ap.parse_args()
+    if not os.path.exists(a.pool):   # download the metadata pool (11,672 submissions) from the Hugging Face hub
+        from huggingface_hub import hf_hub_download
+        os.makedirs(os.path.dirname(a.pool), exist_ok=True)
+        hf_hub_download("demfier/reviewertoo-iclr2025", "iclr2025_full.parquet", repo_type="dataset", local_dir=os.path.dirname(a.pool))
     df = pd.read_parquet(a.pool, columns=["paper_id", "title", "primary_area", "arxiv_id", "decision"])
     idx = zip_index(a.index)
     df["src"] = df.title.map(lambda t: idx.get(slug(t)))
     df["arx"] = df.arxiv_id.fillna("").str.len() > 0
     inz = df[df.src.notna()]
-    sel = pd.concat([
+    use_manifest = os.path.exists(a.manifest) and not a.resample
+    sel = df[df.paper_id.isin(set(pd.read_csv(a.manifest).paper_id))] if use_manifest else pd.concat([
         inz[inz.decision.isin(["accept (oral)", "accept (spotlight)"])],
         inz[inz.decision == "accept (poster)"].sample(a.n_poster, random_state=a.seed),
         inz[inz.decision == "reject"].sample(a.n_reject, random_state=a.seed),
         df[(df.decision == "desk reject") & df.arx],
     ])
+    if a.dry_run:
+        print(f"sample {len(sel)} ({sel.decision.value_counts().to_dict()}), from {'manifest' if use_manifest else 'random draw'}")
+        raise SystemExit
     done = {json.loads(l)["paper_id"] for l in open(a.out)} if os.path.exists(a.out) else set()
     todo = [r for r in sel.itertuples() if r.paper_id not in done]
     print(f"sample {len(sel)} ({sel.decision.value_counts().to_dict()}), todo {len(todo)}", flush=True)

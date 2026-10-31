@@ -6,7 +6,7 @@
 Jobs: [build_hiring GPU] -> hiring shards (GPU) ; coding shards (GPU) -> codeql (CPU) ; review shards (GPU).
 Writes <run>/slurm/*.sbatch, <run>/logs, <run>/launch_manifest.json. Tier sizes: see TIERS.
 """
-import argparse, json, os, subprocess, time
+import argparse, json, os, shutil, subprocess, time
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 # (n_items, n_trials, shards, rounds, extra args) per app. hiring n_items = job-description/resume pairs (x8 groups x variants).
@@ -65,6 +65,9 @@ def sbatch(run, name, body, dry, dep=None, gpu=True, hours=12, mem="128G", cpus=
     return jid
 
 
+REPO_PAIRS = os.path.join(ROOT, "data", "hiring", "pairs.jsonl")   # job description / resume pairs used in our run
+
+
 def job_body(run, app, T, n_items, n_trials, shards, i, extra, hours):
     """One GPU job = [data build] -> run_mas (time-boxed) -> [CodeQL / similarity] -> analysis. Everything runs on the same
     allocation (no separate CPU jobs). run_mas is wrapped in `timeout` so the post-steps still get their time slot; records
@@ -78,6 +81,9 @@ def job_body(run, app, T, n_items, n_trials, shards, i, extra, hours):
     if app == "hiring":
         pairs = f"{run}/hiring/pairs.jsonl"
         data = f"--data {pairs}"
+        if os.path.exists(REPO_PAIRS) and not os.path.exists(pairs):   # reuse the shipped dataset: the build step is then skipped
+            os.makedirs(f"{run}/hiring", exist_ok=True)
+            shutil.copy(REPO_PAIRS, pairs)
         lines.append(f"mkdir -p {run}/hiring; [ -f {pairs} ] || timeout -s TERM {build}m python scripts/build_hiring_data.py --out {pairs} {T['build']}")
     lines.append(f"timeout -s TERM {run_min}m python scripts/run_mas.py --app {app} --out-dir {run}/{app} --n-items {n_items} "
                  f"--n-trials {n_trials} --rounds {T['rounds']} --shard {i}/{shards} --wave 1000 {data} {extra}")

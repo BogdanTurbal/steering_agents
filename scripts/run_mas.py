@@ -36,7 +36,7 @@ if __name__ == "__main__":
     ap.add_argument("--variants", type=int, default=5, help="hiring: signal variants per demographic group (1-5)")
     ap.add_argument("--data", default=None, help="hiring: pairs.jsonl; review: papers.jsonl")
     ap.add_argument("--model", default=DEFAULT_MODEL)
-    ap.add_argument("--quant", default=None, help="e.g. bitsandbytes / fp8; default: none (bf16, as resman)")
+    ap.add_argument("--quant", default=None, help="e.g. bitsandbytes / fp8; default: none (bf16)")
     ap.add_argument("--max-num-seqs", type=int, default=1000)
     ap.add_argument("--effort", default="medium", choices=["low", "medium", "xhigh"])
     ap.add_argument("--max-tokens", type=int, default=12288)

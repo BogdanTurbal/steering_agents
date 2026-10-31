@@ -1,0 +1,617 @@
+{
+ "coding": {
+  "health": [
+   {
+    "phase": "init",
+    "agent": "generator",
+    "calls": 280,
+    "failed_%": 0.0,
+    "retried_%": 0.0,
+    "truncated_%": 0.0,
+    "prompt_too_long": 0,
+    "think_tok_mean": 461.6607142857143,
+    "gen_tok_mean": 633.3321428571429,
+    "gen_tok_p95": 1129.4500000000005
+   },
+   {
+    "phase": "orch",
+    "agent": "generator",
+    "calls": 1400,
+    "failed_%": 0.0,
+    "retried_%": 0.07142857142857142,
+    "truncated_%": 0.0,
+    "prompt_too_long": 0,
+    "think_tok_mean": 758.6878571428572,
+    "gen_tok_mean": 1344.6742857142858,
+    "gen_tok_p95": 3473.1
+   },
+   {
+    "phase": "review",
+    "agent": "correctness",
+    "calls": 1400,
+    "failed_%": 0.0,
+    "retried_%": 0.0,
+    "truncated_%": 0.0,
+    "prompt_too_long": 0,
+    "think_tok_mean": 1177.3942857142856,
+    "gen_tok_mean": 1374.8664285714285,
+    "gen_tok_p95": 2779.05
+   },
+   {
+    "phase": "review",
+    "agent": "optimality",
+    "calls": 1400,
+    "failed_%": 0.0,
+    "retried_%": 0.07142857142857142,
+    "truncated_%": 0.0,
+    "prompt_too_long": 0,
+    "think_tok_mean": 584.4428571428572,
+    "gen_tok_mean": 764.0628571428572,
+    "gen_tok_p95": 1324.05
+   },
+   {
+    "phase": "review",
+    "agent": "readability",
+    "calls": 1400,
+    "failed_%": 0.0,
+    "retried_%": 0.0,
+    "truncated_%": 0.0,
+    "prompt_too_long": 0,
+    "think_tok_mean": 642.3285714285714,
+    "gen_tok_mean": 829.6092857142858,
+    "gen_tok_p95": 1379.3499999999997
+   },
+   {
+    "phase": "review",
+    "agent": "security",
+    "calls": 1400,
+    "failed_%": 0.0,
+    "retried_%": 0.0,
+    "truncated_%": 0.0,
+    "prompt_too_long": 0,
+    "think_tok_mean": 725.8914285714286,
+    "gen_tok_mean": 928.0014285714286,
+    "gen_tok_p95": 1683.5499999999995
+   }
+  ],
+  "totals": {
+   "calls": 7280,
+   "gen_tokens": 7515033,
+   "wall_s_between_first_last_reply": 5593.700000047684,
+   "gen_tok_per_s_overall": 1343.481595354763
+  },
+  "runs_total": 280,
+  "runs_with_all_rounds_so_far": {
+   "1": 280,
+   "2": 280,
+   "3": 280,
+   "4": 280,
+   "5": 280
+  },
+  "scores": {
+   "runs": 280,
+   "rounds": 5,
+   "per_agent": {
+    "security": {
+     "mean_by_round": [
+      2.0,
+      4.09,
+      4.58,
+      4.78,
+      4.85
+     ],
+     "std_by_round": [
+      1.18,
+      0.73,
+      0.55,
+      0.44,
+      0.37
+     ],
+     "hist": {
+      "1": 130,
+      "2": 85,
+      "3": 76,
+      "4": 390,
+      "5": 719
+     }
+    },
+    "optimality": {
+     "mean_by_round": [
+      4.01,
+      4.75,
+      4.9,
+      4.98,
+      4.98
+     ],
+     "std_by_round": [
+      0.85,
+      0.44,
+      0.33,
+      0.14,
+      0.13
+     ],
+     "hist": {
+      "1": 2,
+      "2": 18,
+      "3": 38,
+      "4": 246,
+      "5": 1096
+     }
+    },
+    "correctness": {
+     "mean_by_round": [
+      3.22,
+      4.46,
+      4.75,
+      4.93,
+      4.94
+     ],
+     "std_by_round": [
+      1.06,
+      0.61,
+      0.63,
+      0.36,
+      0.34
+     ],
+     "hist": {
+      "1": 18,
+      "2": 77,
+      "3": 76,
+      "4": 298,
+      "5": 931
+     }
+    },
+    "readability": {
+     "mean_by_round": [
+      3.66,
+      4.53,
+      4.88,
+      4.95,
+      4.99
+     ],
+     "std_by_round": [
+      0.58,
+      0.51,
+      0.36,
+      0.23,
+      0.1
+     ],
+     "hist": {
+      "1": 1,
+      "2": 10,
+      "3": 81,
+      "4": 360,
+      "5": 948
+     }
+    }
+   },
+   "disagreement_by_round": [
+    2.36,
+    0.89,
+    0.54,
+    0.29,
+    0.2
+   ],
+   "endpoint_share_by_round": [
+    0.236,
+    0.524,
+    0.808,
+    0.918,
+    0.947
+   ]
+  },
+  "code_validity": {
+   "1": {
+    "codes": 280,
+    "empty": 0,
+    "python_parses_%": 99.0,
+    "cpp_syntax_ok_% (sample)": 96.25,
+    "mean_chars": 547.4535714285714
+   },
+   "2": {
+    "codes": 280,
+    "empty": 0,
+    "python_parses_%": 98.5,
+    "cpp_syntax_ok_% (sample)": 96.25,
+    "mean_chars": 1685.182142857143
+   },
+   "3": {
+    "codes": 280,
+    "empty": 0,
+    "python_parses_%": 99.0,
+    "cpp_syntax_ok_% (sample)": 95.0,
+    "mean_chars": 2089.4035714285715
+   },
+   "4": {
+    "codes": 280,
+    "empty": 0,
+    "python_parses_%": 99.0,
+    "cpp_syntax_ok_% (sample)": 93.75,
+    "mean_chars": 2225.8535714285713
+   },
+   "5": {
+    "codes": 280,
+    "empty": 0,
+    "python_parses_%": 99.5,
+    "cpp_syntax_ok_% (sample)": 92.5,
+    "mean_chars": 2291.7892857142856
+   },
+   "6": {
+    "codes": 280,
+    "empty": 0,
+    "python_parses_%": 99.0,
+    "cpp_syntax_ok_% (sample)": 93.75,
+    "mean_chars": 2316.9035714285715
+   }
+  },
+  "codeql": {
+   "codes": 1680,
+   "with_alert_%": 37.38095238095238
+  }
+ },
+ "hiring": {
+  "health": [
+   {
+    "phase": "review",
+    "agent": "experience",
+    "calls": 3200,
+    "failed_%": 0.0,
+    "retried_%": 0.0,
+    "truncated_%": 0.0,
+    "prompt_too_long": 0,
+    "think_tok_mean": 1144.278125,
+    "gen_tok_mean": 1471.1765625,
+    "gen_tok_p95": 2444.349999999998
+   },
+   {
+    "phase": "review",
+    "agent": "impact",
+    "calls": 3200,
+    "failed_%": 0.0,
+    "retried_%": 0.0,
+    "truncated_%": 0.0,
+    "prompt_too_long": 0,
+    "think_tok_mean": 1106.859375,
+    "gen_tok_mean": 1417.105625,
+    "gen_tok_p95": 2353.0
+   },
+   {
+    "phase": "review",
+    "agent": "operational",
+    "calls": 3200,
+    "failed_%": 0.0,
+    "retried_%": 0.0,
+    "truncated_%": 0.0,
+    "prompt_too_long": 0,
+    "think_tok_mean": 1135.6990625,
+    "gen_tok_mean": 1470.8184375,
+    "gen_tok_p95": 2452.0499999999997
+   },
+   {
+    "phase": "review",
+    "agent": "subject",
+    "calls": 3200,
+    "failed_%": 0.0,
+    "retried_%": 0.0,
+    "truncated_%": 0.0,
+    "prompt_too_long": 0,
+    "think_tok_mean": 1155.4834375,
+    "gen_tok_mean": 1487.7875,
+    "gen_tok_p95": 2563.0999999999995
+   }
+  ],
+  "totals": {
+   "calls": 12800,
+   "gen_tokens": 18710042,
+   "wall_s_between_first_last_reply": 14100.099999904633,
+   "gen_tok_per_s_overall": 1326.9439223925042
+  },
+  "runs_total": 640,
+  "runs_with_all_rounds_so_far": {
+   "1": 640,
+   "2": 640,
+   "3": 640,
+   "4": 640,
+   "5": 640
+  },
+  "scores": {
+   "runs": 640,
+   "rounds": 5,
+   "per_agent": {
+    "subject": {
+     "mean_by_round": [
+      3.3,
+      3.32,
+      3.33,
+      3.33,
+      3.33
+     ],
+     "std_by_round": [
+      0.75,
+      0.76,
+      0.77,
+      0.77,
+      0.77
+     ],
+     "hist": {
+      "1": 5,
+      "2": 543,
+      "3": 1085,
+      "4": 1546,
+      "5": 21
+     }
+    },
+    "experience": {
+     "mean_by_round": [
+      3.35,
+      3.36,
+      3.36,
+      3.36,
+      3.36
+     ],
+     "std_by_round": [
+      0.84,
+      0.83,
+      0.83,
+      0.82,
+      0.82
+     ],
+     "hist": {
+      "1": 1,
+      "2": 587,
+      "3": 1017,
+      "4": 1455,
+      "5": 140
+     }
+    },
+    "impact": {
+     "mean_by_round": [
+      3.13,
+      3.22,
+      3.26,
+      3.28,
+      3.28
+     ],
+     "std_by_round": [
+      0.76,
+      0.77,
+      0.77,
+      0.78,
+      0.78
+     ],
+     "hist": {
+      "2": 644,
+      "3": 1181,
+      "4": 1349,
+      "5": 26
+     }
+    },
+    "operational": {
+     "mean_by_round": [
+      3.2,
+      3.26,
+      3.29,
+      3.29,
+      3.29
+     ],
+     "std_by_round": [
+      0.79,
+      0.8,
+      0.8,
+      0.8,
+      0.8
+     ],
+     "hist": {
+      "2": 686,
+      "3": 994,
+      "4": 1497,
+      "5": 23
+     }
+    }
+   },
+   "disagreement_by_round": [
+    0.53,
+    0.31,
+    0.24,
+    0.22,
+    0.22
+   ],
+   "endpoint_share_by_round": [
+    0.014,
+    0.017,
+    0.018,
+    0.018,
+    0.018
+   ]
+  },
+  "adversary_check": {
+   "adv | evaluator that is adversarial in 'adv'": [
+    3.225,
+    3.294,
+    3.344,
+    3.353,
+    3.35
+   ],
+   "adv | other evaluators": [
+    3.264,
+    3.305,
+    3.322,
+    3.325,
+    3.326
+   ],
+   "base | evaluator that is adversarial in 'adv'": [
+    3.197,
+    3.256,
+    3.284,
+    3.288,
+    3.288
+   ],
+   "base | other evaluators": [
+    3.25,
+    3.291,
+    3.299,
+    3.304,
+    3.308
+   ]
+  }
+ },
+ "review": {
+  "health": [
+   {
+    "phase": "orch",
+    "agent": "author",
+    "calls": 600,
+    "failed_%": 0.0,
+    "retried_%": 1.3333333333333333,
+    "truncated_%": 0.0,
+    "prompt_too_long": 0,
+    "think_tok_mean": 1686.8216666666667,
+    "gen_tok_mean": 6004.34,
+    "gen_tok_p95": 8485.55
+   },
+   {
+    "phase": "orch",
+    "agent": "metareviewer",
+    "calls": 600,
+    "failed_%": 0.0,
+    "retried_%": 0.0,
+    "truncated_%": 0.0,
+    "prompt_too_long": 0,
+    "think_tok_mean": 1109.24,
+    "gen_tok_mean": 2889.855,
+    "gen_tok_p95": 3546.6999999999994
+   },
+   {
+    "phase": "review",
+    "agent": "empiricist",
+    "calls": 792,
+    "failed_%": 0.0,
+    "retried_%": 0.0,
+    "truncated_%": 0.0,
+    "prompt_too_long": 0,
+    "think_tok_mean": 1728.334595959596,
+    "gen_tok_mean": 4008.080808080808,
+    "gen_tok_p95": 4918.849999999999
+   },
+   {
+    "phase": "review",
+    "agent": "pragmatist",
+    "calls": 794,
+    "failed_%": 0.0,
+    "retried_%": 0.12594458438287154,
+    "truncated_%": 0.0,
+    "prompt_too_long": 0,
+    "think_tok_mean": 1629.8413098236776,
+    "gen_tok_mean": 3882.8702770780856,
+    "gen_tok_p95": 4779.8499999999985
+   },
+   {
+    "phase": "review",
+    "agent": "theorist",
+    "calls": 791,
+    "failed_%": 0.0,
+    "retried_%": 0.0,
+    "truncated_%": 0.0,
+    "prompt_too_long": 0,
+    "think_tok_mean": 1910.206068268015,
+    "gen_tok_mean": 4283.941845764854,
+    "gen_tok_p95": 5648.5
+   }
+  ],
+  "totals": {
+   "calls": 3577,
+   "gen_tokens": 14982514,
+   "wall_s_between_first_last_reply": 26698.60000014305,
+   "gen_tok_per_s_overall": 561.1722712022249
+  },
+  "runs_total": 300,
+  "runs_with_all_rounds_so_far": {
+   "1": 300,
+   "2": 300,
+   "3": 191,
+   "4": 0,
+   "5": 0
+  },
+  "scores": {
+   "runs": 194,
+   "rounds": 3,
+   "per_agent": {
+    "pragmatist": {
+     "mean_by_round": [
+      5.51,
+      6.05,
+      6.14
+     ],
+     "std_by_round": [
+      0.97,
+      0.96,
+      0.96
+     ],
+     "hist": {
+      "1": 3,
+      "2": 3,
+      "3": 14,
+      "4": 14,
+      "5": 2,
+      "6": 1,
+      "7": 1,
+      "8": 11
+     }
+    },
+    "theorist": {
+     "mean_by_round": [
+      5.44,
+      5.98,
+      6.13
+     ],
+     "std_by_round": [
+      1.02,
+      0.93,
+      0.92
+     ],
+     "hist": {
+      "2": 6,
+      "3": 10,
+      "4": 29,
+      "5": 127,
+      "6": 1,
+      "7": 140,
+      "8": 6
+     }
+    },
+    "empiricist": {
+     "mean_by_round": [
+      5.3,
+      5.9,
+      6.11
+     ],
+     "std_by_round": [
+      0.91,
+      0.96,
+      0.94
+     ],
+     "hist": {
+      "1": 3,
+      "2": 3,
+      "3": 12,
+      "4": 25,
+      "5": 1,
+      "6": 3,
+      "7": 109,
+      "8": 6
+     }
+    }
+   },
+   "disagreement_by_round": [
+    0.57,
+    0.43,
+    0.28
+   ],
+   "endpoint_share_by_round": [
+    0.003,
+    0.003,
+    0.003
+   ]
+  }
+ }
+}

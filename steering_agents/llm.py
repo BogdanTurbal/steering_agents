@@ -5,10 +5,9 @@ import zlib
 from dataclasses import dataclass
 
 HF_HOME = os.environ.get("HF_HOME", os.path.expanduser("~/.cache/huggingface"))
-# Default (user request 2026-10-26): full bf16 checkpoint, NO quantization, as in resman. quant="bitsandbytes" gives in-flight
-# 4-bit loading (slow decode, ~12-16 tok/s/seq in the smoke run). The pre-quantized unsloth checkpoint
-# (unsloth/Qwen3.8-27B-unsloth-bnb-4bit) does NOT load in vLLM 0.25.1: bitsandbytes_loader hits
-# `assert param_data.shape == loaded_weight.shape` in linear.py weight_loader (smoke jobs 16291449/51/53, 2026-10-26).
+# Default: the full bf16 checkpoint, no quantization. quant="bitsandbytes" gives in-flight 4-bit loading, which decodes slowly
+# (~12-16 tok/s per sequence in a small test). The pre-quantized unsloth checkpoint (unsloth/Qwen3.8-27B-unsloth-bnb-4bit)
+# does not load in vLLM 0.25.1: bitsandbytes_loader fails on `assert param_data.shape == loaded_weight.shape`.
 DEFAULT_MODEL = "Qwen/Qwen3.8-27B"
 
 
@@ -40,18 +39,17 @@ def split_think(text):
 
 
 def prepare_vllm_env():
-    """Same cluster-safe defaults as resman/models/vllm_thinking.py::_prepare_vllm_runtime_env."""
-    os.environ.setdefault("VLLM_USE_FLASHINFER_SAMPLER", "0")   # FlashInfer JIT sampler fails on Della (no curand.h)
+    """Cluster-safe vLLM defaults, set before the engine is created (existing values are respected)."""
+    os.environ.setdefault("VLLM_USE_FLASHINFER_SAMPLER", "0")   # the FlashInfer JIT sampler fails on nodes without curand.h
     os.environ.setdefault("VLLM_BATCH_INVARIANT", "0")
     os.environ.setdefault("VLLM_HOST_IP", "127.0.0.1")
 
 
 class Engine:
-    """Mirrors resman's VLLMThinkingModel: same LLM() kwargs (dtype auto, tp 1, gpu util 0.90, trust_remote_code, no eager,
-    gdn_prefill_backend triton), prompts rendered with tokenizer.apply_chat_template(enable_thinking=True,
-    reasoning_effort=...) and fed to vLLM as text, same sampling values as resman's Qwen3.8 configs
-    (temperature 1.0, top_p 0.95, top_k 20). Differences on purpose: max_model_len 262144 and max_num_seqs 1000 (user request),
-    prefix caching on (long shared prefixes), per-request seeds."""
+    """vLLM wrapper for Qwen3.8 with thinking. LLM() settings: dtype auto, tensor parallel 1, GPU memory 0.90,
+    trust_remote_code, CUDA graphs on, gdn_prefill_backend triton, max_model_len 262144, max_num_seqs 1000, prefix caching
+    (long shared prompt prefixes). Prompts are rendered with tokenizer.apply_chat_template(enable_thinking=True,
+    reasoning_effort=...) and fed to vLLM as text; sampling is temperature 1.0, top_p 0.95, top_k 20 with a per-request seed."""
 
     def __init__(self, model=DEFAULT_MODEL, max_model_len=262144, gpu_mem=0.90, effort="medium", max_tokens=12288,
                  max_num_seqs=1000, quant=None, gdn_prefill_backend="triton"):
@@ -71,7 +69,7 @@ class Engine:
         self.tok = self.llm.get_tokenizer()
 
     def render(self, messages):
-        """Chat template -> text, exactly as resman's apply_chat_template (drops unknown kwargs if the template rejects them)."""
+        """Chat template -> text (drops reasoning_effort if the template rejects it)."""
         kw = dict(tokenize=False, add_generation_prompt=True, enable_thinking=True, reasoning_effort=self.effort)
         try:
             return self.tok.apply_chat_template(messages, **kw)
