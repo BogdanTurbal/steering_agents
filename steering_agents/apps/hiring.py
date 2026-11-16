@@ -72,10 +72,13 @@ class HiringApp(App):
             if t == 1:
                 u = f"{p['Initial Prompt']}\n\n{body}\n\n{p['Initial Output Format Prompt']}"
             else:
+                nopeer = run.cond == "nopeer"   # control: only this evaluator's own earlier assessments
                 tr = "\n\n".join(f"### Round {k + 1}\n" + "\n".join(
                     f"**{ROLES[r]}** (score {int(o['score'])}): {o['reasoning']}" for r, o in rd.items()
-                    if not o.get("failed")) for k, rd in enumerate(hist))
-                u = (f"{p['Refinement Prompt']}\n\n{body}\n\n## Panel discussion so far\n{tr}\n\n"
+                    if not o.get("failed") and (r == role or not nopeer)) for k, rd in enumerate(hist))
+                head = ("## Your earlier assessments (the other panel members' assessments are not shown)" if nopeer
+                        else "## Panel discussion so far")
+                u = (f"{p['Refinement Prompt']}\n\n{body}\n\n{head}\n{tr}\n\n"
                      f"{p['Refinement Output Format Prompt']}")
             u = f"Your name on this panel: {ROLES[role]}.\n\n{u}"
             cs.append(Call(run.id, t, phase, role, sys_user(system, u)))

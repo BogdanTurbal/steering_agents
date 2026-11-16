@@ -50,7 +50,8 @@ python scripts/analyze.py --run-dir experiments/<run>             # figures + su
 python scripts/estimate_cost.py                                   # rough GPU-hour estimate per tier
 python tests/confidence_test.py                                   # CPU check of the confidence probes
 PYTHONPATH=tests/local_vllm python tests/local_model_smoke.py --out /tmp/lms   # small real Qwen, no GPU/vLLM (see notes/confidence_plan.md §7.3)
-python scripts/launch_mas_pipeline.py --tier medium --name conf --confidence   # with agent confidence measures
+python scripts/launch_mas_pipeline.py --tier medium --name conf --confidence --controls   # + agent confidence, no-peer control, repeats
+python scripts/compare_runs.py --a experiments/<run without --confidence> --b experiments/<conf run>   # does the confidence field change the system?
 ```
 `--confidence` gives every worker reply a `conf` field: token distributions of its score after thinking (C1) and
 without thinking (C1n), and of its private 1-5 confidence (C2p). Each job then writes

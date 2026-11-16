@@ -63,8 +63,8 @@ def score_sanity(app, recs, runs):
     return out
 
 
-def coding_quality(d, n_cpp=300):
-    codes = collect(d)
+def coding_quality(d, keep, n_cpp=300):
+    codes = [c for c in collect(d) if c[0] in keep]   # main runs only (no nopeer / rep controls)
     if not codes:
         return None
     by = defaultdict(lambda: {"py_ok": [], "len": [], "empty": 0, "n": 0})
@@ -141,13 +141,13 @@ if __name__ == "__main__":
                                                           ["agent", "mean by round", "std by round", "score counts"])
                       + f"\n\nMean max-min spread across agents by round: {sc['disagreement_by_round']}  \nShare of scores at the scale endpoints by round: {sc['endpoint_share_by_round']}\n")
         if app == "coding":
-            cq = coding_quality(d)
+            cq = coding_quality(d, set(runs))
             if cq:
                 rep["code_validity"] = cq
                 md.append("\n### Generated code validity\n\n" + md_table([{"round": r, **v} for r, v in cq.items()], ["round", "codes", "empty", "python_parses_%", "cpp_syntax_ok_% (sample)", "mean_chars"]) + "\n")
             cqr = f"{d}/codeql_results.jsonl"
             if os.path.exists(cqr):
-                rows = [json.loads(l) for l in open(cqr)]
+                rows = [r for r in map(json.loads, open(cqr)) if r["run"] in runs]
                 rep["codeql"] = {"codes": len(rows), "with_alert_%": 100 * float(np.mean([bool(r["rules"]) for r in rows]))}
                 md.append(f"\nCodeQL: {len(rows)} codes analysed, {rep['codeql']['with_alert_%']:.1f}% have at least one alert.\n")
         if app == "hiring":

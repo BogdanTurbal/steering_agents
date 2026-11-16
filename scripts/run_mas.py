@@ -5,7 +5,7 @@
 import argparse, json, os, sys, time
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from steering_agents.llm import Engine, DEFAULT_MODEL
-from steering_agents.mas import Runner
+from steering_agents.mas import Runner, control_runs
 
 
 def make_app(a):
@@ -36,6 +36,10 @@ if __name__ == "__main__":
     ap.add_argument("--adv-rounds", type=int, default=2)
     ap.add_argument("--variants", type=int, default=5, help="hiring: signal variants per demographic group (1-5)")
     ap.add_argument("--data", default=None, help="hiring: pairs.jsonl; review: papers.jsonl")
+    ap.add_argument("--nopeer-frac", type=float, default=0.0, help="confidence study: share of items that also get a "
+                    "no-peer control run (workers see only their own earlier replies)")
+    ap.add_argument("--rep-frac", type=float, default=0.0, help="confidence study: share of items that get extra trials")
+    ap.add_argument("--rep-trials", type=int, default=3, help="total trials for the --rep-frac items (incl. the main one)")
     ap.add_argument("--confidence", action="store_true", help="measure agent confidence: private 1-5 confidence field for "
                     "coding/review reviewers + token-likelihood probes of score and confidence (records get a `conf` field)")
     ap.add_argument("--model", default=DEFAULT_MODEL)
@@ -51,6 +55,7 @@ if __name__ == "__main__":
     if os.path.exists(done_marker):   # finished earlier (e.g. a resumed job): skip the 3-4 min model load
         print("shard already finished:", done_marker); sys.exit(0)
     runs = app.runs(a.n_items, a.n_trials, a.seed)
+    runs += control_runs(app, a.n_items, a.seed, a.nopeer_frac, a.rep_frac, a.rep_trials, a.n_trials)
     print(f"{a.app}: {len(runs)} runs total, shard {i}/{n}", flush=True)
     eng = Engine(a.model, max_model_len=a.max_model_len, effort=a.effort, max_tokens=a.max_tokens, max_num_seqs=a.max_num_seqs, quant=a.quant)
     t0 = time.time()

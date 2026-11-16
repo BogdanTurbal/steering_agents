@@ -77,12 +77,15 @@ class CodingApp(App):
                     u = (f"{p['Initial Prompt']}\n\n# Original code stub\n{fence(run.item['stub'], run.item['lang'])}\n\n"
                          f"# Complete code to review\n{fence(code, run.item['lang'])}\n\n{fmt}")
                 else:
-                    hist = self._hist(run, own=None if self.reviewers_see_all else role)
+                    # nopeer control: own earlier feedback only; the code stays the round-1 code (see orch below)
+                    hist = self._hist(run, own=None if self.reviewers_see_all and run.cond != "nopeer" else role)
                     u = (f"{p['Refinement Prompt']}\n\n(You are the {role} reviewer.)\n\n{hist}\n\n"
                          f"# Latest round (round {t}) complete code to review\n{fence(code, run.item['lang'])}\n\n"
                          f"{fmt}")
                 cs.append(Call(run.id, t, phase, role, sys_user(p["System Prompt"].replace("{language}", lang), u)))
             return cs
+        if run.cond == "nopeer":   # no rewrite: a generator reads every reviewer's feedback and would pass it on
+            return []
         p = persona("Code Generator")   # orch: rewrite given all critics' feedback of round t
         hist = self._hist(run) if len(s["rev"]) >= t else None
         u = f"{p['Refinement Prompt']}\n\n{hist}\n\n{p['Refinement Output Format Prompt']}"
@@ -110,7 +113,9 @@ class CodingApp(App):
         s = run.state
         s.setdefault("codes", [])
         s.setdefault("rev", [])
-        if phase in ("init", "orch"):
+        if phase == "orch" and not results:   # nopeer control: the code is not rewritten
+            s["codes"].append(s["codes"][-1])
+        elif phase in ("init", "orch"):
             g = results["generator"]
             if g.get("failed"):   # keep previous code if the generator failed
                 g = {"output": s["codes"][-1] if s["codes"] else run.item["stub"]}

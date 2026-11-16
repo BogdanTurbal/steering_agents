@@ -22,6 +22,8 @@ done = {json.loads(l)["key"] for l in open(out_path)} if os.path.exists(out_path
 codes = {}   # (item, round) -> {trial: code}
 for run, rnd, code in collect(a.run_dir):
     item, trial = run.rsplit("#t", 1)
+    if not trial.isdigit():   # e.g. "<item>#t0#nopeer": a different condition, not another trial
+        continue
     codes.setdefault((item, rnd), {})[int(trial)] = code
 items = sorted({i for i, _ in codes})[: a.n_prompts]
 p = persona("Code Similarity Judge")

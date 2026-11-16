@@ -3,6 +3,7 @@
   python scripts/launch_mas_pipeline.py --tier smoke --dry-run
   python scripts/launch_mas_pipeline.py --tier pilot --name pilot1
   python scripts/launch_mas_pipeline.py --tier medium --name conf --confidence   # with confidence measures
+  python scripts/launch_mas_pipeline.py --tier medium --name conf --confidence --controls   # + no-peer control and repeats
 
 Jobs: [build_hiring GPU] -> hiring shards (GPU) ; coding shards (GPU) -> codeql (CPU) ; review shards (GPU).
 Writes <run>/slurm/*.sbatch, <run>/logs, <run>/launch_manifest.json. Tier sizes: see TIERS.
@@ -66,6 +67,8 @@ def sbatch(run, name, body, dry, dep=None, gpu=True, hours=12, mem="128G", cpus=
     return jid
 
 
+CONTROLS = "--nopeer-frac 0.2 --rep-frac 0.1 --rep-trials 3"   # confidence study, notes/confidence_plan.md §6
+CONTROLS_TIME = 1.4   # ~20-40% more runs per job (fewer for hiring), so the time limit grows with them
 REPO_PAIRS = os.path.join(ROOT, "data", "hiring", "pairs.jsonl")   # job description / resume pairs used in our run
 
 
@@ -107,6 +110,8 @@ if __name__ == "__main__":
     ap.add_argument("--extra", default="", help="extra args for run_mas.py (e.g. --effort low)")
     ap.add_argument("--confidence", action="store_true", help="measure agent confidence (adds --confidence to run_mas.py; "
                     "kept on --resume)")
+    ap.add_argument("--controls", action="store_true", help=f"confidence study: also run a no-peer control and repeated "
+                    f"trials on a subset of items ({CONTROLS}); job time x{CONTROLS_TIME}; kept on --resume")
     ap.add_argument("--resume", default=None, help="existing run dir: resubmit only shards without a done marker (replies already "
                     "saved in records_shard*.jsonl are reused)")
     a = ap.parse_args()
@@ -115,7 +120,11 @@ if __name__ == "__main__":
         a.tier, a.extra, a.apps = old["tier"], old["args"]["extra"], old["args"]["apps"]
     if a.confidence and "--confidence" not in a.extra:
         a.extra = f"{a.extra} --confidence".strip()
-    T = TIERS[a.tier]
+    if a.controls and "--nopeer-frac" not in a.extra:
+        a.extra = f"{a.extra} {CONTROLS}".strip()
+    T = dict(TIERS[a.tier])
+    if "--nopeer-frac" in a.extra or "--rep-frac" in a.extra:
+        T["hours"] = int(-(-T["hours"] * CONTROLS_TIME // 1))
     run = os.path.abspath(a.resume) if a.resume else os.path.join(ROOT, "experiments", f"{a.name or a.tier}_{time.strftime('%Y%m%d_%H%M%S')}")
     os.makedirs(f"{run}/slurm", exist_ok=True)
     os.makedirs(f"{run}/logs", exist_ok=True)
