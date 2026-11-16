@@ -18,7 +18,7 @@ See `report/main.tex` (Overleaf-ready, with the first results) and `notes/plan.m
 - `steering_agents/` library: `llm.py` (vLLM engine), `mas.py` (resumable batched runner), `metrics.py`, `apps/{coding,hiring,review}.py`
 - `scripts/` launcher (`launch_mas_pipeline.py`), worker (`run_mas.py`), data prep, `analyze.py`, `quality_report.py`, `codeql_eval.py`, `estimate_cost.py`
 - `data/personas.json` persona prompts from the paper's Appendix I (built by `scripts/extract_personas.py`), `data/hiring/bls_directions.json`
-- `tests/fake_engine_test.py` CPU-only end-to-end test with a fake engine
+- `tests/fake_engine_test.py` CPU-only end-to-end test with a fake engine; `tests/confidence_test.py` probe logic with a fake vLLM
 
 ## Setup
 1. Python env with `vllm`, `torch`, `transformers`, `numpy`, `pandas`, `matplotlib` (tested: vllm 0.25.1), plus `pymupdf`, `remotezip`, `openpyxl` for data prep.
@@ -48,5 +48,11 @@ python scripts/launch_mas_pipeline.py --tier medium               # one GPU job 
 python scripts/launch_mas_pipeline.py --resume experiments/<run>  # continue an interrupted run (saved replies are reused)
 python scripts/analyze.py --run-dir experiments/<run>             # figures + summary.json; also run by each job at its end
 python scripts/estimate_cost.py                                   # rough GPU-hour estimate per tier
+python tests/confidence_test.py                                   # CPU check of the confidence probes
+PYTHONPATH=tests/local_vllm python tests/local_model_smoke.py --out /tmp/lms   # small real Qwen, no GPU/vLLM (see notes/confidence_plan.md §7.3)
+python scripts/launch_mas_pipeline.py --tier medium --name conf --confidence   # with agent confidence measures
 ```
+`--confidence` gives every worker reply a `conf` field: token distributions of its score after thinking (C1) and
+without thinking (C1n), and of its private 1-5 confidence (C2p). Each job then writes
+`analysis/confidence/{replies,summary}_<app>.*`. Details and the hypotheses are in `notes/confidence_plan.md`; its §7-8 cover setup, local tests and the cluster handover.
 Every reply is appended to `experiments/<run>/<app>/records_shard*.jsonl` as soon as it finishes.

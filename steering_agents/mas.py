@@ -55,6 +55,9 @@ class App(ABC):
     def parse(self, call, text): ...        # dict or None
     @abstractmethod
     def apply(self, run, t, phase, results): ...   # results: agent -> parsed dict (or {"failed": True})
+    def probe_spec(self, call):
+        """{field: K} of the numbers whose token distribution is read after the reply (confidence.py), or None."""
+        return None
 
 
 def sys_user(system, user):
@@ -85,8 +88,9 @@ class Runner:
             keys = list(pending)
             nxt, n, ntok, t0 = {}, 0, 0, time.time()
             batch = [(pending[k].messages, seed_for(k, attempts[k])) for k in keys]
+            probes = [self.app.probe_spec(pending[k]) for k in keys]
             with open(self.rec_path, "a", buffering=1) as f:
-                for i, o in self.eng.stream(batch):
+                for i, o in self.eng.stream(batch, probes if any(probes) else None):
                     k, c = keys[i], pending[keys[i]]
                     parsed = self.app.parse(c, o.answer) if o.answer else None
                     attempts[k] += 1
@@ -98,6 +102,8 @@ class Runner:
                                "parsed": parsed if parsed is not None else {"failed": True},
                                "answer": o.answer, "think_tokens": o.think_tokens, "n_tokens": o.n_tokens,
                                "finish": o.finish, "attempts": attempts[k], "time": round(time.time(), 1)}
+                        if o.conf is not None:
+                            rec["conf"] = o.conf
                         self.done[k] = rec
                         f.write(json.dumps(rec) + "\n")
                     if n % 200 == 0:

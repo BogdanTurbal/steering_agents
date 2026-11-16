@@ -12,12 +12,13 @@ def make_app(a):
     dk = {"data": a.data} if a.data else {}
     if a.app == "coding":
         from steering_agents.apps.coding import CodingApp
-        return CodingApp(T=a.rounds, reviewers_see_all=not a.reviewers_own_only)
+        return CodingApp(T=a.rounds, reviewers_see_all=not a.reviewers_own_only, confidence=a.confidence)
     if a.app == "hiring":
         from steering_agents.apps.hiring import HiringApp
-        return HiringApp(T=a.rounds, adversary=a.adversary, adv_rounds=a.adv_rounds, variants=a.variants, **dk)
+        return HiringApp(T=a.rounds, adversary=a.adversary, adv_rounds=a.adv_rounds, variants=a.variants,
+                         confidence=a.confidence, **dk)
     from steering_agents.apps.review import ReviewApp
-    return ReviewApp(T=a.rounds, **dk)
+    return ReviewApp(T=a.rounds, confidence=a.confidence, **dk)
 
 
 if __name__ == "__main__":
@@ -35,6 +36,8 @@ if __name__ == "__main__":
     ap.add_argument("--adv-rounds", type=int, default=2)
     ap.add_argument("--variants", type=int, default=5, help="hiring: signal variants per demographic group (1-5)")
     ap.add_argument("--data", default=None, help="hiring: pairs.jsonl; review: papers.jsonl")
+    ap.add_argument("--confidence", action="store_true", help="measure agent confidence: private 1-5 confidence field for "
+                    "coding/review reviewers + token-likelihood probes of score and confidence (records get a `conf` field)")
     ap.add_argument("--model", default=DEFAULT_MODEL)
     ap.add_argument("--quant", default=None, help="e.g. bitsandbytes / fp8; default: none (bf16)")
     ap.add_argument("--max-num-seqs", type=int, default=1000)

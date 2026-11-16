@@ -5,7 +5,7 @@ import random
 
 from ..jsonio import parse_fields
 from ..mas import App, Call, Run, sys_user
-from ..personas import persona
+from ..personas import persona, with_confidence
 
 DATA = os.path.join(os.path.dirname(__file__), "..", "..", "data", "iclr2025", "papers_review.jsonl")
 REVIEWERS = {"pragmatist": "Paper Reviewer Pragmatist", "theorist": "Paper Reviewer Theorist",
@@ -17,8 +17,10 @@ class ReviewApp(App):
     name = "review"
     scale = (1, 10)
 
-    def __init__(self, T=5, data=DATA):
-        self.T, self.data = T, data
+    def __init__(self, T=5, data=DATA, confidence=False):
+        """confidence: reviewers also report a private 1-5 confidence, and their score/confidence token distributions
+        are probed (notes/confidence_plan.md)."""
+        self.T, self.data, self.confidence = T, data, confidence
 
     def runs(self, n_items, n_trials, seed=0):
         papers = [json.loads(l) for l in open(self.data)]
@@ -58,12 +60,15 @@ class ReviewApp(App):
             cs = []
             for role, pname in REVIEWERS.items():
                 p = persona(pname)
+                fmt = p["Initial Output Format Prompt" if t == 1 else "Refinement Output Format Prompt"]
+                rem = p["Trailing Output-Format Reminder"]
+                if self.confidence:
+                    fmt, rem = with_confidence(fmt), with_confidence(rem)
                 if t == 1:
-                    u = f"{p['Initial Prompt']}\n\n{paper}\n\n{p['Initial Output Format Prompt']}\n\n{p['Trailing Output-Format Reminder']}"
+                    u = f"{p['Initial Prompt']}\n\n{paper}\n\n{fmt}\n\n{rem}"
                 else:
                     u = (f"{p['Refinement Prompt']}\n\n{paper}\n\n# Discussion so far (you are the {role.capitalize()} reviewer)\n"
-                         f"{self._discussion(run, 'reviewer')}\n\n{p['Refinement Output Format Prompt']}\n\n"
-                         f"{p['Trailing Output-Format Reminder']}")
+                         f"{self._discussion(run, 'reviewer')}\n\n{fmt}\n\n{rem}")
                 cs.append(Call(run.id, t, phase, role, sys_user(p["System Prompt"], u)))
             return cs
         cs = []
@@ -76,11 +81,19 @@ class ReviewApp(App):
 
     def parse(self, call, text):
         if call.agent in REVIEWERS:
+            if self.confidence:
+                r = parse_fields(text, str_fields=("output",), num_fields=("score", "confidence"),
+                                 bounds={"score": (1, 10), "confidence": (1, 5)})
+                if r is not None:
+                    return r
             return parse_fields(text, str_fields=("output",), num_fields=("score",), bounds={"score": (1, 10)})
         if call.agent == "metareviewer":
             r = parse_fields(text, str_fields=("output",), num_fields=("decision",), bounds={"decision": (1, 5)})
             return r or parse_fields(text, str_fields=("output",))
         return parse_fields(text, str_fields=("output",))
+
+    def probe_spec(self, call):
+        return {"score": 10, "confidence": 5} if self.confidence and call.agent in REVIEWERS else None
 
     def apply(self, run, t, phase, results):
         s = run.state

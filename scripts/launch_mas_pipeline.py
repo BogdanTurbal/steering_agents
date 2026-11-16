@@ -2,6 +2,7 @@
 
   python scripts/launch_mas_pipeline.py --tier smoke --dry-run
   python scripts/launch_mas_pipeline.py --tier pilot --name pilot1
+  python scripts/launch_mas_pipeline.py --tier medium --name conf --confidence   # with confidence measures
 
 Jobs: [build_hiring GPU] -> hiring shards (GPU) ; coding shards (GPU) -> codeql (CPU) ; review shards (GPU).
 Writes <run>/slurm/*.sbatch, <run>/logs, <run>/launch_manifest.json. Tier sizes: see TIERS.
@@ -92,6 +93,8 @@ def job_body(run, app, T, n_items, n_trials, shards, i, extra, hours):
             lines.append(f"timeout -s TERM 25m python scripts/code_similarity.py --run-dir {run}/coding --n-prompts {T['sim_prompts']} {extra}")
         lines.append(f"timeout -s TERM 35m python scripts/codeql_eval.py --run-dir {run}/coding --workers 4")
     lines.append(f"python scripts/analyze.py --run-dir {run} --partial; python scripts/quality_report.py --run-dir {run}")
+    if "--confidence" in extra:
+        lines.append(f"python scripts/confidence_table.py --run-dir {run} --apps {app}")
     return "\n".join(lines)
 
 
@@ -102,12 +105,16 @@ if __name__ == "__main__":
     ap.add_argument("--apps", default="coding,hiring,review")
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--extra", default="", help="extra args for run_mas.py (e.g. --effort low)")
+    ap.add_argument("--confidence", action="store_true", help="measure agent confidence (adds --confidence to run_mas.py; "
+                    "kept on --resume)")
     ap.add_argument("--resume", default=None, help="existing run dir: resubmit only shards without a done marker (replies already "
                     "saved in records_shard*.jsonl are reused)")
     a = ap.parse_args()
     if a.resume:   # take tier/args from the original launch
         old = json.load(open(os.path.join(a.resume, "launch_manifest.json")))
         a.tier, a.extra, a.apps = old["tier"], old["args"]["extra"], old["args"]["apps"]
+    if a.confidence and "--confidence" not in a.extra:
+        a.extra = f"{a.extra} --confidence".strip()
     T = TIERS[a.tier]
     run = os.path.abspath(a.resume) if a.resume else os.path.join(ROOT, "experiments", f"{a.name or a.tier}_{time.strftime('%Y%m%d_%H%M%S')}")
     os.makedirs(f"{run}/slurm", exist_ok=True)

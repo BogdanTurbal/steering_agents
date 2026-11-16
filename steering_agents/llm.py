@@ -4,6 +4,8 @@ import os
 import zlib
 from dataclasses import dataclass
 
+from . import confidence as CF
+
 HF_HOME = os.environ.get("HF_HOME", os.path.expanduser("~/.cache/huggingface"))
 # Default: the full bf16 checkpoint, no quantization. quant="bitsandbytes" gives in-flight 4-bit loading, which decodes slowly
 # (~12-16 tok/s per sequence in a small test). The pre-quantized unsloth checkpoint (unsloth/Qwen3.8-27B-unsloth-bnb-4bit)
@@ -30,6 +32,7 @@ class Out:
     think_tokens: int
     n_tokens: int
     finish: str
+    conf: dict | None = None   # token-likelihood confidence (steering_agents/confidence.py), only if probes were requested
 
 
 def split_think(text):
@@ -68,18 +71,21 @@ class Engine:
         self.llm = LLM(**kw)
         self.tok = self.llm.get_tokenizer()
 
-    def render(self, messages):
+    def render(self, messages, thinking=True):
         """Chat template -> text (drops reasoning_effort if the template rejects it)."""
-        kw = dict(tokenize=False, add_generation_prompt=True, enable_thinking=True, reasoning_effort=self.effort)
+        kw = dict(tokenize=False, add_generation_prompt=True, enable_thinking=thinking, reasoning_effort=self.effort)
         try:
             return self.tok.apply_chat_template(messages, **kw)
         except TypeError:
             kw.pop("reasoning_effort")
             return self.tok.apply_chat_template(messages, **kw)
 
-    def stream(self, batch):
+    def stream(self, batch, probes=None):
         """batch: list of (messages, seed). Yields (index, Out) as soon as each request finishes (so callers can persist
-        every reply immediately). Uses vLLM's enqueue + engine.step loop (what LLM.generate does internally)."""
+        every reply immediately). Uses vLLM's enqueue + engine.step loop (what LLM.generate does internally).
+        probes: optional list (one per batch item) of {field: K} or None. When a reply finishes, 1-token probes at those
+        fields are enqueued right away (their prefix is still in the prefix cache) and the reply is yielded with Out.conf
+        once all its probes are back (see confidence.py)."""
         from vllm import SamplingParams
         texts = [self.render(m) for m, _ in batch]
         plen = [len(self.tok.encode(t, add_special_tokens=False)) for t in texts]
@@ -99,12 +105,55 @@ class Engine:
         # enqueue returns INTERNAL ids ("<counter>-<8 random chars>", vLLM input_processor.assign_request_id), while
         # RequestOutput.request_id is the external "<counter>": key by the external part.
         id2i = {rid.rsplit("-", 1)[0]: i for rid, i in zip(ids, ok)}
+        probe_of = {}   # probe request id -> (batch index, probe name)
+        waiting = {}    # batch index -> [Out, spec, {probe name: top logprobs}, n probes left, cached tokens, prompt tokens,
+                        #                {field: number written}]
         eng = self.llm.llm_engine
         while eng.has_unfinished_requests():
             for o in eng.step():
-                if o.finished:
-                    rid = o.request_id if o.request_id in id2i else o.request_id.rsplit("-", 1)[0]
-                    yield id2i[rid], self._out(o)
+                if not o.finished:
+                    continue
+                rid = o.request_id if (o.request_id in id2i or o.request_id in probe_of) else o.request_id.rsplit("-", 1)[0]
+                if rid in id2i:
+                    i, out = id2i[rid], self._out(o)
+                    spec = probes[i] if probes else None
+                    pre, written = self._probe_prefixes(batch[i][0], o, spec) if spec and out.answer else ({}, {})
+                    if not pre:
+                        yield i, out
+                        continue
+                    names = list(pre)
+                    psp = SamplingParams(max_tokens=1, temperature=1.0, logprobs=CF.TOP_LOGPROBS)
+                    pids = self.llm.enqueue([{"prompt_token_ids": pre[n]} for n in names], [psp] * len(names), use_tqdm=False)
+                    for pid, n in zip(pids, names):
+                        probe_of[pid.rsplit("-", 1)[0]] = (i, n)
+                    waiting[i] = [out, spec, {}, len(names), 0, 0, written]
+                else:
+                    i, name = probe_of.pop(rid)
+                    w = waiting[i]
+                    lp = o.outputs[0].logprobs
+                    if lp:
+                        w[2][name] = {t: x.logprob for t, x in lp[0].items()}
+                    w[3] -= 1
+                    w[4] += getattr(o, "num_cached_tokens", 0) or 0
+                    w[5] += len(o.prompt_token_ids or [])
+                    if w[3] == 0:
+                        del waiting[i]
+                        w[0].conf = CF.assemble(w[1], w[2], self.digits, round(w[4] / w[5], 3) if w[5] else None, w[6])
+                        yield i, w[0]
+
+    def _probe_prefixes(self, messages, o, spec):
+        """Token prefixes of the probes for one finished reply (confidence.probe_prefixes); C1n uses the same messages
+        rendered with thinking disabled plus a forced `{"score": `."""
+        if not hasattr(self, "digits"):
+            self.digits, self.ten_ok = CF.digit_ids(self.tok), CF.splits_ten(self.tok)
+            if not self.ten_ok:
+                print('WARNING: the tokenizer writes "10" as one token; 1-10 scores are not probed', flush=True)
+        nothink = None
+        if "score" in spec:
+            nothink = self.tok.encode(self.render(messages, thinking=False) + CF.NOTHINK_PREFIX, add_special_tokens=False)
+        pre, written = CF.probe_prefixes(self.tok, list(o.prompt_token_ids), list(o.outputs[0].token_ids), spec, nothink,
+                                         self.ten_ok)
+        return {n: x for n, x in pre.items() if len(x) < self.max_model_len - 1}, written   # too long fails the whole enqueue
 
     def chat(self, batch):
         """Blocking variant: list[Out] in input order."""

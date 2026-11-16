@@ -5,7 +5,7 @@ import random
 
 from ..jsonio import parse_fields
 from ..mas import App, Call, Run, sys_user
-from ..personas import persona
+from ..personas import persona, with_confidence
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..", "data", "codelmsec", "benchmark", "benchmark_data")
 REVIEWERS = {"security": "Code Reviewer Security", "optimality": "Code Reviewer Optimality",
@@ -30,10 +30,12 @@ class CodingApp(App):
     name = "coding"
     scale = (1, 5)
 
-    def __init__(self, T=5, reviewers_see_all=True):
+    def __init__(self, T=5, reviewers_see_all=True, confidence=False):
         """reviewers_see_all: reviewers get the broadcast global state (all codes + all four reviewers' feedback), as in
-        Alg. 1. False = paper-literal reading of "the critic's feedback": a reviewer sees only its own past reviews."""
-        self.T, self.reviewers_see_all = T, reviewers_see_all
+        Alg. 1. False = paper-literal reading of "the critic's feedback": a reviewer sees only its own past reviews.
+        confidence: reviewers also report a private 1-5 confidence, and their score/confidence token distributions are
+        probed (notes/confidence_plan.md)."""
+        self.T, self.reviewers_see_all, self.confidence = T, reviewers_see_all, confidence
 
     def runs(self, n_items, n_trials, seed=0):
         items = load_items()
@@ -69,14 +71,16 @@ class CodingApp(App):
             cs = []
             for role, pname in REVIEWERS.items():
                 p = persona(pname)
+                fmt = p["Initial Output Format Prompt" if t == 1 else "Refinement Output Format Prompt"]
+                fmt = with_confidence(fmt) if self.confidence else fmt
                 if t == 1:
                     u = (f"{p['Initial Prompt']}\n\n# Original code stub\n{fence(run.item['stub'], run.item['lang'])}\n\n"
-                         f"# Complete code to review\n{fence(code, run.item['lang'])}\n\n{p['Initial Output Format Prompt']}")
+                         f"# Complete code to review\n{fence(code, run.item['lang'])}\n\n{fmt}")
                 else:
                     hist = self._hist(run, own=None if self.reviewers_see_all else role)
                     u = (f"{p['Refinement Prompt']}\n\n(You are the {role} reviewer.)\n\n{hist}\n\n"
                          f"# Latest round (round {t}) complete code to review\n{fence(code, run.item['lang'])}\n\n"
-                         f"{p['Refinement Output Format Prompt']}")
+                         f"{fmt}")
                 cs.append(Call(run.id, t, phase, role, sys_user(p["System Prompt"].replace("{language}", lang), u)))
             return cs
         p = persona("Code Generator")   # orch: rewrite given all critics' feedback of round t
@@ -92,7 +96,15 @@ class CodingApp(App):
                 m = re.search(r"```(?:python|cpp|c\+\+|c)?\n(.*?)```", text, re.S)
                 return {"output": m.group(1)} if m else None
             return r
+        if self.confidence:
+            r = parse_fields(text, str_fields=("output",), num_fields=("score", "confidence"),
+                             bounds={"score": (1, 5), "confidence": (1, 5)})
+            if r is not None:
+                return r
         return parse_fields(text, str_fields=("output",), num_fields=("score",), bounds={"score": (1, 5)})
+
+    def probe_spec(self, call):
+        return {"score": 5, "confidence": 5} if self.confidence and call.agent in REVIEWERS else None
 
     def apply(self, run, t, phase, results):
         s = run.state
