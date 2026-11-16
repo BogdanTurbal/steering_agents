@@ -292,7 +292,51 @@ next_score, switch, peer_mean (in nopeer runs this is the placebo peer mean: pee
 - round-1 test-retest across the rep trials: score SD, and the rank correlation of C2 / C1 p_max / C2p E between trials.
 
 ## 7. Setup and local testing
-### 7.1 Environment
+### 7.0 From a fresh clone to the first job (cluster login node)
+Run on the login node, which has internet; the compute nodes may not. `<...>` are values to fill in.
+```
+# 1. Code (until the PR is merged, the work is on the branch feat/confidence-measures)
+git clone https://github.com/BogdanTurbal/steering_agents.git && cd steering_agents
+git checkout feat/confidence-measures
+
+# 2. Python env (any Python 3.10-3.12; vllm pulls in torch and transformers)
+conda create -y -n steering_agents python=3.12 && conda activate steering_agents
+pip install "vllm==0.25.1" numpy pandas matplotlib huggingface_hub pymupdf remotezip openpyxl
+
+# 3. Cluster settings read by the launcher (put them in ~/.bashrc so later shells have them)
+export HF_HOME=<big disk>/hf                          # model cache, visible from the compute nodes
+export STEERING_ENV_SETUP="module load <...>; conda activate steering_agents"   # run at the start of every job
+export STEERING_TMP=<node-local scratch, e.g. /tmp>   # per-job vLLM / triton / inductor caches
+export SLURM_GPU_PARTITION=<gpu partition>  SLURM_CPU_PARTITION=<cpu partition>
+export MAIL_USER=<optional e-mail for failure notices>
+
+# 4. Model. llm.resolve_model looks in $HF_HOME/models--Qwen--Qwen3.8-27B/snapshots/, NOT in the default $HF_HOME/hub/,
+#    so download with --cache-dir "$HF_HOME" (a plain download fails later with "not in HF_HOME").
+huggingface-cli download Qwen/Qwen3.8-27B --cache-dir "$HF_HOME"
+ls "$HF_HOME"/models--Qwen--Qwen3.8-27B/snapshots/   # must list one snapshot directory
+
+# 5. Data. Coding stubs and hiring pairs are in the repo. Review needs the ICLR texts (≈1,918 papers, resumable):
+python scripts/prepare_iclr_data.py                  # writes data/iclr2025/papers_review.jsonl from the manifest
+wc -l data/iclr2025/papers_review.jsonl              # ≈ 1918
+# CodeQL for the coding labels (version used so far: 2.27.3; check the asset name on the releases page):
+mkdir -p tools/codeql_bundle && curl -L https://github.com/github/codeql-action/releases/download/codeql-bundle-v2.27.3/codeql-bundle-linux64.tar.gz | tar -xz -C tools/codeql_bundle
+tools/codeql_bundle/codeql/codeql version            # must print 2.27.3
+
+# 6. CPU tests (no GPU needed, a few seconds each)
+python tests/confidence_test.py                      # ends with "confidence_test ok"
+python tests/fake_engine_test.py                     # ends with "no-peer control prompts ok"
+
+# 7. Dry run: writes the sbatch files without submitting
+python scripts/launch_mas_pipeline.py --tier smoke --name conf --confidence --controls --dry-run
+grep run_mas experiments/conf_*/slurm/*.sbatch       # each line must contain --confidence and --nopeer-frac
+rm -r experiments/conf_*                             # remove the dry-run dir before the real launch
+
+# 8. Submit: continue with §8.1 step 2 (smoke run)
+```
+Watch jobs with `squeue -u $USER`. Logs are in `experiments/<run>/logs/<app>_0_<jobid>.{out,err}`. Progress lines look
+like `round 3 phase review: 1120 calls` and `pass done: ... gen tok/s ...`.
+
+### 7.1 Environment (details)
 - Python ≥ 3.10 (the code uses `str | None` annotations; the macOS system Python 3.9 cannot import `llm.py`).
 - GPU jobs: `vllm==0.25.1`, `torch`, `transformers`, `numpy`, `pandas`, `matplotlib` in one env (the env the existing
   runs used). Nothing new is needed for the confidence code. `confidence_table.py` needs only `numpy` + `pandas` (no scipy).
@@ -383,11 +427,12 @@ afterwards on the CSV files, without a GPU.
 
 ### 8.1 Steps
 The order matters: 2 must pass before 4, and 5 needs both runs.
-1. Set up the env and data (§7.1). Run the two CPU tests on the login node: `python tests/confidence_test.py` and
-   `python tests/fake_engine_test.py`. Both must pass before anything is submitted. (`tests/local_model_smoke.py` is for
+1. Set up the env and data with §7.0, steps 1-7. The two CPU tests must pass, and the dry run must show the flags,
+   before anything is submitted. (`tests/local_model_smoke.py` is for
    laptops without vLLM; on the cluster the smoke tier below is the real-model check.)
-2. Smoke run (1 h, a few items per app):
-   `python scripts/launch_mas_pipeline.py --tier smoke --name conf --confidence`
+2. Smoke run (a few items per app, 2 rounds; 2 h limit with the controls):
+   `python scripts/launch_mas_pipeline.py --tier smoke --name conf --confidence --controls`
+   It prints the run directory (`experiments/conf_<date>_<time>`) and one job id per app.
 3. Check the smoke run (§8.2). If a check fails, see §8.3 before going further. Do not launch bigger tiers on a failed
    smoke run.
 4. Medium run with the controls (one GPU job per app, time limit 12 h instead of 8 h: coding 280 stubs, hiring 40 pairs

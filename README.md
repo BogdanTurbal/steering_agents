@@ -22,7 +22,7 @@ See `report/main.tex` (Overleaf-ready, with the first results) and `notes/plan.m
 
 ## Setup
 1. Python env with `vllm`, `torch`, `transformers`, `numpy`, `pandas`, `matplotlib` (tested: vllm 0.25.1), plus `pymupdf`, `remotezip`, `openpyxl` for data prep.
-2. Download `Qwen/Qwen3.8-27B` into your Hugging Face cache (`HF_HOME`). Compute nodes may be offline, so download beforehand.
+2. Download `Qwen/Qwen3.8-27B` into your Hugging Face cache (`HF_HOME`). Compute nodes may be offline, so download beforehand. Use `huggingface-cli download Qwen/Qwen3.8-27B --cache-dir "$HF_HOME"`: the code looks in `$HF_HOME/models--...`, not in the default `$HF_HOME/hub/`. Step-by-step cluster setup: `notes/confidence_plan.md` §7.0.
 3. Data. Included in `data/` (everything needed to rerun without downloading datasets):
    - `personas.json`: persona prompts from the paper's Appendix I (rebuild with `scripts/extract_personas.py` from the paper PDF)
    - `codelmsec/benchmark/`: the 280 CodeLMSec code stubs (200 Python, 80 C), released with https://github.com/codelmsec/codelmsec
