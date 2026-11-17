@@ -31,16 +31,23 @@ def style(ax, title=None, xl=None, yl=None):
     if yl: ax.set_ylabel(yl, fontsize=8, color=INK)
 
 
-def load(d):
-    recs, runs = {}, {}
+def load(d, controls=False):
+    """controls=False drops the confidence study's extra runs (cond nopeer / rep) and their replies, so the paper's
+    metrics and the quality report are unchanged."""
+    recs, runs, drop = {}, {}, set()
+    for p in glob.glob(f"{d}/runs_shard*.jsonl"):
+        for ln in open(p):
+            r = json.loads(ln)
+            if controls or r.get("cond") not in ("nopeer", "rep"):
+                runs[r["run"]] = r
+            else:
+                drop.add(r["run"])
     for p in glob.glob(f"{d}/records_shard*.jsonl"):
         for ln in open(p):
             try: r = json.loads(ln)
             except json.JSONDecodeError: continue
-            recs[r["key"]] = r
-    for p in glob.glob(f"{d}/runs_shard*.jsonl"):
-        for ln in open(p):
-            r = json.loads(ln); runs[r["run"]] = r
+            if r["run"] not in drop:
+                recs[r["key"]] = r
     return recs, runs
 
 
@@ -290,9 +297,9 @@ if __name__ == "__main__":
         if os.path.isdir(f"{a.run_dir}/{app}"):
             fn(a.run_dir, out, summary)
             # Fig 7: cross-trial variance of the panel mean (surface-level variance from sampling)
-            recs, runs = load(f"{a.run_dir}/{app}")
+            recs, runs = load(f"{a.run_dir}/{app}", controls=True)
             if recs:
-                base = {k: v for k, v in runs.items() if v["cond"] == "base"}
+                base = {k: v for k, v in runs.items() if v["cond"] in ("base", "rep")}   # rep = extra trials of base
                 T = eff_T(app, recs, base)
                 S = score_tensor(app, recs, base, T) if T else {}
                 v = variance_over_trials(S, runs, T) if S else None

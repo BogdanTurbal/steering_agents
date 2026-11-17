@@ -32,10 +32,12 @@ class HiringApp(App):
     name = "hiring"
     scale = (1, 5)
 
-    def __init__(self, T=5, adversary=False, adv_rounds=2, variants=5, adv_roles=None, data=DATA):
+    def __init__(self, T=5, adversary=False, adv_rounds=2, variants=5, adv_roles=None, data=DATA, confidence=False):
         """adversary: also run the 'adv' condition (one biased evaluator for rounds 1..adv_rounds, then its normal persona).
-        variants: signal variants per demographic group (paper: 5 -> 40 resumes per pair)."""
+        variants: signal variants per demographic group (paper: 5 -> 40 resumes per pair).
+        confidence: probe the score/confidence token distributions (the personas already ask for a 1-5 confidence)."""
         self.T, self.adversary, self.adv_rounds, self.variants, self.data = T, adversary, adv_rounds, variants, data
+        self.confidence = confidence
         self.adv_roles = adv_roles or ROLE_ORDER
 
     def runs(self, n_items, n_trials, seed=0):
@@ -70,10 +72,13 @@ class HiringApp(App):
             if t == 1:
                 u = f"{p['Initial Prompt']}\n\n{body}\n\n{p['Initial Output Format Prompt']}"
             else:
+                nopeer = run.cond == "nopeer"   # control: only this evaluator's own earlier assessments
                 tr = "\n\n".join(f"### Round {k + 1}\n" + "\n".join(
                     f"**{ROLES[r]}** (score {int(o['score'])}): {o['reasoning']}" for r, o in rd.items()
-                    if not o.get("failed")) for k, rd in enumerate(hist))
-                u = (f"{p['Refinement Prompt']}\n\n{body}\n\n## Panel discussion so far\n{tr}\n\n"
+                    if not o.get("failed") and (r == role or not nopeer)) for k, rd in enumerate(hist))
+                head = ("## Your earlier assessments (the other panel members' assessments are not shown)" if nopeer
+                        else "## Panel discussion so far")
+                u = (f"{p['Refinement Prompt']}\n\n{body}\n\n{head}\n{tr}\n\n"
                      f"{p['Refinement Output Format Prompt']}")
             u = f"Your name on this panel: {ROLES[role]}.\n\n{u}"
             cs.append(Call(run.id, t, phase, role, sys_user(system, u)))
@@ -85,6 +90,9 @@ class HiringApp(App):
         if r is None:
             r = parse_fields(text, str_fields=("reasoning",), num_fields=("score",), bounds={"score": (1, 5)})
         return r
+
+    def probe_spec(self, call):
+        return {"score": 5, "confidence": 5} if self.confidence else None
 
     def apply(self, run, t, phase, results):
         run.state.setdefault("hist", []).append(results)

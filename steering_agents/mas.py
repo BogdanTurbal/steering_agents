@@ -55,10 +55,35 @@ class App(ABC):
     def parse(self, call, text): ...        # dict or None
     @abstractmethod
     def apply(self, run, t, phase, results): ...   # results: agent -> parsed dict (or {"failed": True})
+    def probe_spec(self, call):
+        """{field: K} of the numbers whose token distribution is read after the reply (confidence.py), or None."""
+        return None
 
 
 def sys_user(system, user):
     return [{"role": "system", "content": system}, {"role": "user", "content": user}]
+
+
+CONTROL_CONDS = ("nopeer", "rep")   # extra runs for the confidence study; the paper's metrics use only the other conditions
+
+
+def control_runs(app, n_items, seed=0, nopeer_frac=0.0, rep_frac=0.0, rep_trials=1, main_trials=1):
+    """Extra runs on a prefix of the (seeded, shuffled) items, for the confidence study (notes/confidence_plan.md):
+    - cond "nopeer": the base condition, but from round 2 on every worker sees only its own earlier replies (no peers, no
+      orchestrator messages). Separates conformity from spontaneous score drift.
+    - cond "rep": trials main_trials..rep_trials-1 of the base condition (trials below main_trials are the main run), for
+      run-to-run variability.
+    App.runs takes a prefix of the same shuffled list, so these items are the first ones of the main run."""
+    out = []
+    n_np = max(1, round(nopeer_frac * n_items)) if nopeer_frac > 0 else 0
+    for r in app.runs(n_np, 1, seed) if n_np else []:
+        if r.cond == "base":
+            out.append(Run(r.id.removesuffix("#base") + "#nopeer", r.item, r.trial, "nopeer"))
+    n_rep = max(1, round(rep_frac * n_items)) if rep_frac > 0 and rep_trials > main_trials else 0
+    for r in app.runs(n_rep, rep_trials, seed) if n_rep else []:
+        if r.cond == "base" and r.trial >= main_trials:
+            out.append(Run(r.id.removesuffix("#base") + ("#rep" if r.id.endswith("#base") else ""), r.item, r.trial, "rep"))
+    return out
 
 
 class Runner:
@@ -85,8 +110,9 @@ class Runner:
             keys = list(pending)
             nxt, n, ntok, t0 = {}, 0, 0, time.time()
             batch = [(pending[k].messages, seed_for(k, attempts[k])) for k in keys]
+            probes = [self.app.probe_spec(pending[k]) for k in keys]
             with open(self.rec_path, "a", buffering=1) as f:
-                for i, o in self.eng.stream(batch):
+                for i, o in self.eng.stream(batch, probes if any(probes) else None):
                     k, c = keys[i], pending[keys[i]]
                     parsed = self.app.parse(c, o.answer) if o.answer else None
                     attempts[k] += 1
@@ -98,6 +124,8 @@ class Runner:
                                "parsed": parsed if parsed is not None else {"failed": True},
                                "answer": o.answer, "think_tokens": o.think_tokens, "n_tokens": o.n_tokens,
                                "finish": o.finish, "attempts": attempts[k], "time": round(time.time(), 1)}
+                        if o.conf is not None:
+                            rec["conf"] = o.conf
                         self.done[k] = rec
                         f.write(json.dumps(rec) + "\n")
                     if n % 200 == 0:
@@ -107,6 +135,7 @@ class Runner:
             pending = nxt
 
     def run(self, runs):
+        assert len({r.id for r in runs}) == len(runs), "duplicate run ids"
         runs = sorted(runs, key=lambda r: r.id)[self.shard[0]::self.shard[1]]
         with open(os.path.join(self.out, f"runs_shard{self.shard[0]}of{self.shard[1]}.jsonl"), "w") as f:
             for r in runs:
